@@ -1,0 +1,6 @@
+{
+  "name": "Konrad Schultz Real Estate",
+  "description": "Luxury South Florida real estate platform with active listings, interactive map, home valuation, and AI concierge for Konrad Schultz, Realtor® at Beachfront Realty (License # 3188541).",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
