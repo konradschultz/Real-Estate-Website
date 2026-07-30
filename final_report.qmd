@@ -1,0 +1,284 @@
+---
+title: "South Florida Real Estate Analytics & AI Valuation Statistical Report"
+subtitle: "Data-Driven Market Intelligence & Analytical Agent Skills for Aventura, Sunny Isles, Bal Harbour & Miami"
+author: "Konrad Schultz, Realtor® (Beachfront Realty • License # 3188541)"
+date: today
+format:
+  html:
+    theme: cosmo
+    toc: true
+    toc-depth: 3
+    code-fold: show
+    fig-width: 8
+    fig-height: 5
+execute:
+  warning: false
+  message: false
+---
+
+# 1. Introduction
+
+This report delivers a quantitative statistical evaluation of the South Florida luxury residential real estate market, covering premier sub-markets including **Aventura, Sunny Isles Beach, Bal Harbour, Brickell, and Fort Lauderdale**. 
+
+### Industry Context & Intended User
+Designed for Realtor® Konrad Schultz (Beachfront Realty, License # 3188541), this analytical system serves luxury property buyers, sellers, listing agents, and real estate investors requiring empirical market intelligence over subjective opinion.
+
+### Problem Statement
+1. **Extreme Price-per-Square-Foot Variance**: Oceanfront orientation, tower luxury amenities, and floor height stacks cause prices to range widely (\$600/sqft to \$1,200+/sqft).
+2. **HOA Fee Distortion on Net Yields**: Monthly maintenance fees (\$700–\$2,400/mo) heavily reduce investor Net Operating Income (NOI) and cap rates.
+3. **Liquidity Penalties & Days-On-Market (DOM)**: Overpriced properties experience exponential delays in Days-On-Market, damaging seller bargaining leverage.
+
+### Decision Supported & Project Goal
+This project provides an automated, reproducible analytical engine supporting data-driven offer pricing, comparative group testing, hedonic value estimation, rental cash flow benchmarking, liquidity elasticity modeling, and stochastic ROI stress-testing.
+
+### Selected Implementation Level
+This project implements **Level 1 (Quarto Statistical Report)** as well as **Level 3 (Full Local Statistical Application with R Plumber API Backend)**.
+
+---
+
+# 2. Dataset
+
+### Data Source & Unit of Observation
+The dataset (`/analysis/south_florida_mls_data.csv`) comprises active public MLS listing observations across prime South Florida coastal corridors. Each row represents a single residential property listing.
+
+### Number of Observations & Main Variables
+* **Sample Size**: 10 active luxury property listings across Aventura, Sunny Isles Beach, Bal Harbour, Key Biscayne, Brickell, Edgewater, and Fort Lauderdale.
+* **Key Variables**: `mls_number`, `title`, `city`, `neighborhood`, `property_type`, `price`, `sqft`, `beds`, `baths`, `year_built`, `hoa_monthly`, `price_per_sqft`, `days_on_market`, `cap_rate`.
+
+### Data Preparation, Missing Data, and Quality Audits
+Data was cleaned using `/analysis/R/clean_data.R`. The automated cleaning routine verifies non-null positive values for price and square footage, checks for missing variables, and calculates derived price-per-square-foot values.
+
+```{r dataset-summary}
+# Load dataset
+df <- read.csv("south_florida_mls_data.csv", stringsAsFactors = FALSE)
+
+knitr::kable(df[, c("mls_number", "title", "city", "neighborhood", "property_type", "price", "sqft", "price_per_sqft", "cap_rate", "days_on_market")], 
+             caption = "South Florida Active MLS Listings Sample",
+             format.args = list(big.mark = ","))
+```
+
+---
+
+# 3. Explore Skill
+
+### User Question
+What is the distribution, central tendency, variation, and data quality of price per square foot across South Florida listings?
+
+### Method & Statistics
+Computes parametric metrics (Mean, Standard Deviation) and non-parametric metrics (Median, IQR, Min, Max), checks for missing values, and plots distribution histograms.
+
+```{r skill-1-explore}
+source("R/explore.R")
+explore_res <- run_explore_data(df, target_variable = "price_per_sqft")
+
+cat("Sample Size:", explore_res$sample_size, "\n")
+cat("Mean Price/SqFt: $", explore_res$mean, "\n")
+cat("Median Price/SqFt: $", explore_res$median, "\n")
+cat("Standard Deviation: $", explore_res$sd, "\n")
+cat("Interquartile Range (IQR): $", explore_res$iqr, "\n")
+
+hist(df$price_per_sqft, col = "royalblue", border = "white",
+     main = "Distribution of Price per Square Foot in South Florida",
+     xlab = "Price per SqFt ($)", ylab = "Frequency")
+abline(v = median(df$price_per_sqft), col = "red", lwd = 2, lty = 2)
+legend("topright", legend = c("Median Price/SqFt"), col = "red", lty = 2, lwd = 2)
+```
+
+### Validation, Main Result & Interpretation
+* **Validation**: Confirmed target variable exists, is numeric, and contains $N \ge 3$ records.
+* **Result**: Median price/sqft is \$782.16 (IQR = \$333.23, Mean = \$850.46, SD = \$211.14), based on the N = 10 active listings in the dataset.
+* **Interpretation**: Prices exhibit a right-skewed distribution driven by ultra-luxury waterfront estates in Bal Harbour (\$1,193.88/sqft).
+
+### Limitation
+Descriptive statistics reveal sample properties but do not account for temporal shifts or building amenity premiums.
+
+---
+
+# 4. Compare Skill
+
+### User Question
+Is there a statistically and practically significant difference in unit valuation ($/sqft) between Single Family Homes and Luxury Condominiums?
+
+### Method & Variables
+Two-sample Welch's t-test comparing `price_per_sqft` (numeric outcome) between `Single Family` and `Luxury Condo` (grouping variable).
+
+```{r skill-2-compare}
+source("R/compare.R")
+compare_res <- run_compare_groups(df, group_col = "property_type", group1 = "Luxury Condo", group2 = "Single Family", outcome_metric = "price_per_sqft")
+
+cat("Group 1 (Luxury Condos) Mean: $", compare_res$group1_mean, " (N =", compare_res$group1_n, ")\n")
+cat("Group 2 (Single Family) Mean: $", compare_res$group2_mean, " (N =", compare_res$group2_n, ")\n")
+cat("Mean Difference: $", compare_res$mean_difference, "/sqft\n")
+cat("95% Confidence Interval for Difference: [$", compare_res$ci_95_lower, ", $", compare_res$ci_95_upper, "]\n")
+cat("p-value:", compare_res$p_value, "\n")
+
+boxplot(price_per_sqft ~ property_type, data = df, col = c("lightcyan", "gold"),
+        main = "Price/SqFt Comparison: Luxury Condos vs. Single Family",
+        ylab = "Price per SqFt ($)", xlab = "Property Category")
+```
+
+### Validation, Interpretation & Limitation
+* **Validation**: Verified both groups contain $n \ge 2$ valid observations.
+* **Result**: Single Family homes averaged \$986.53/sqft ($n=2$) vs. \$970.10/sqft ($n=2$) for Luxury Condos (mean difference = \$16.42/sqft, $t = -0.09$, $p = 0.937$, 95% CI: [-\$852.45, \$819.60]).
+* **Interpretation**: With only two observations per group, the difference is not statistically significant at $\alpha = 0.05$; the current dataset does not support a confident claim about a land-equity premium either way.
+* **Limitation**: Unadjusted comparison does not control for building age or exact water frontage feet. More importantly, group sizes of $n=2$ each severely limit statistical power — this result should be treated as preliminary pending a larger sample of each property type.
+
+---
+
+# 5. Model Skill
+
+### User Question
+What is the estimated market value of a South Florida luxury property given square footage, bedrooms, bathrooms, and monthly HOA fees?
+
+### Method, Outcome & Predictors
+Multiple linear regression (Hedonic Pricing Model) with outcome `price` ($) and predictors `sqft`, `beds`, `baths`, and `hoa_monthly`.
+
+```{r skill-3-model}
+source("R/model.R")
+model_res <- run_statistical_model(df, target_sqft = 2400, target_beds = 3, target_baths = 3.5, target_hoa = 850)
+
+cat("Model R-Squared:", model_res$r_squared, "\n")
+cat("Adjusted R-Squared:", model_res$adj_r_squared, "\n")
+cat("Estimated Market Valuation for Target Property: $", format(model_res$point_estimate_price, big.mark=","), "\n")
+cat("95% Confidence Interval: [$", format(model_res$confidence_95_lower, big.mark=","), ", $", format(model_res$confidence_95_upper, big.mark=","), "]\n")
+```
+
+### Evaluation Metric, Results & Interpretation
+* **Metric**: $R^2 = 0.976$ (Adjusted $R^2 = 0.956$).
+* **Valuation Result**: A 2,400 sqft residence with 3 beds, 3.5 baths, and \$850/mo HOA has a point estimate of \$2,324,800 (95% CI: [\$1,212,235, \$3,437,364]).
+* **Interpretation**: The model explains most observed price variance, but with only 10 observations fitting 4 predictors (5 residual degrees of freedom), the very high $R^2$ likely reflects overfitting rather than a stable, generalizable relationship — the wide confidence interval reflects that underlying uncertainty.
+* **Limitation**: Linear models assume additive feature impacts and may underpredict ultra-custom architectural finishes. More importantly, this sample size is too small to reliably estimate four coefficients at once; the model should be refit once significantly more listings are available.
+
+---
+
+# 6. Additional Skill 1: Cap Rate & NOI Financial Modeling
+
+### Skill Name & User Question
+* **Skill Name**: Cap Rate & NOI Financial Modeling
+* **User Question**: What is the Net Operating Income (NOI), Effective Gross Income (EGI), and Cap Rate for a luxury rental asset?
+
+### Method & Formula
+$$\text{EGI} = (\text{Monthly Rent} \times 12) \times (1 - \text{Vacancy Rate})$$
+$$\text{NOI} = \text{EGI} - \text{Operating Expenses}, \quad \text{Cap Rate (\%)} = (\text{NOI} / \text{Price}) \times 100$$
+
+```{r skill-4-caprate}
+source("R/cap_rate_noi.R")
+cap_res <- run_cap_rate_noi(property_price = 1200000, gross_monthly_rent = 7500, vacancy_rate = 0.05, annual_expenses = 12000)
+
+cat("Property Acquisition Price: $", format(cap_res$property_price, big.mark=","), "\n")
+cat("Effective Gross Income (EGI): $", format(cap_res$effective_gross_income, big.mark=","), "\n")
+cat("Annual Net Operating Income (NOI): $", format(cap_res$net_operating_income, big.mark=","), "\n")
+cat("Cap Rate:", cap_res$cap_rate_percent, "%\n")
+```
+
+### Validation, Result & Limitation
+* **Validation**: Enforced positive purchase price/rent, vacancy rate $0 \le v \le 0.20$, and expenses < revenue.
+* **Result**: \$1,200,000 property generating \$7,500/mo rent yields \$73,500 NOI and a 6.13% Cap Rate.
+* **Limitation**: Excludes mortgage debt service and income tax depreciation benefits.
+
+---
+
+# 7. Additional Skill 2: Days-On-Market Liquidity Elasticity
+
+### Skill Name & User Question
+* **Skill Name**: Days-On-Market Liquidity Elasticity
+* **User Question**: How sensitive is listing liquidity (Days-On-Market) to price per square foot premiums in South Florida?
+
+### Method & Regression
+Pearson correlation ($r$) and linear regression slope ($\beta$) evaluating additional DOM per \$100/sqft price premium.
+
+```{r skill-5-dom}
+source("R/dom_elasticity.R")
+dom_res <- run_dom_elasticity(df)
+
+cat("Pearson Correlation (Price/SqFt vs. DOM):", dom_res$pearson_correlation, "\n")
+cat("Liquidity Penalty:", dom_res$days_added_per_100_dollars_sqft, "additional Days-On-Market per $100/sqft price premium\n")
+cat("Median Market DOM:", dom_res$median_days_on_market, "days\n")
+
+plot(df$price_per_sqft, df$days_on_market, pch = 19, col = "darkgreen",
+     main = "Price/SqFt vs. Days-On-Market (Liquidity Elasticity)",
+     xlab = "Price per SqFt ($)", ylab = "Days-On-Market (DOM)")
+abline(lm(days_on_market ~ price_per_sqft, data = df), col = "red", lwd = 2)
+```
+
+### Validation, Result & Limitation
+* **Validation**: Verified dataset contains $N \ge 5$ records with positive standard deviation.
+* **Result**: Strong positive correlation ($r = 0.721$). Overpricing by \$100/sqft adds ~4.9 days on market. Median market DOM is 24.5 days.
+* **Limitation**: Correlation does not prove causation; DOM is also affected by staging and tenant access.
+
+---
+
+# 8. Additional Skill 3: Monte Carlo Investor ROI Simulation
+
+### Skill Name & User Question
+* **Skill Name**: Monte Carlo Investor ROI Simulation
+* **User Question**: What is the probabilistic distribution and 90% confidence range for Cash-on-Cash ROI under rental rate and occupancy volatility?
+
+### Method & Simulation
+Draws $N=1,000$ stochastic iterations for rent $R_i \sim \mathcal{N}(\mu, \sigma^2)$ and occupancy $O_i \sim \text{Truncated Normal}(0.94, 0.03)$, computing cash-on-cash ROI across iterations.
+
+```{r skill-6-montecarlo}
+source("R/monte_carlo_roi.R")
+mc_res <- run_monte_carlo_roi(purchase_price = 1000000, down_payment = 200000, mean_rent = 6500, sd_rent = 500, simulations = 1000)
+
+cat("Total Monte Carlo Simulations:", mc_res$total_simulations, "\n")
+cat("Expected Mean Cash-on-Cash ROI:", mc_res$mean_cash_on_cash_roi, "%\n")
+cat("Median Cash-on-Cash ROI:", mc_res$median_cash_on_cash_roi, "%\n")
+cat("90% Confidence Interval: [", mc_res$confidence_5th_percentile, "%, ", mc_res$confidence_95th_percentile, "%]\n")
+cat("Probability of Positive Cash Flow:", mc_res$probability_positive_cashflow_percent, "%\n")
+```
+
+### Validation, Result & Limitation
+* **Validation**: Confirmed down payment $\le$ purchase price, $100 \le N \le 10,000$, and positive mean rent.
+* **Result**: Expected mean Cash-on-Cash ROI is approximately 3.6% (median ≈ 3.7%), with a 90% CI of roughly [-1.6%, 8.4%] and an 88.5% probability of positive cash flow across N = 1,000 simulated iterations.
+* **Limitation**: Assumes normal distribution of rents and does not model unexpected HOA special assessments. The modest expected ROI reflects the specific financing assumptions used (\$48,000/yr debt service and \$18,000/yr operating expenses against a \$200,000 down payment) — returns are highly sensitive to leverage and financing terms.
+
+---
+
+# 9. Google Antigravity and Agent Skills
+
+### Agent Guidance & Useful Contributions
+Google Antigravity was instructed using skill specifications in `skills/*/SKILL.md`. The skills provided explicit procedural instructions, required inputs, validation rules, and statistical methods. One major agent contribution was building the modular R structure and Plumber API router (`plumber.R`).
+
+### Student Corrections & Verification
+* **Correction**: The initial agent code for Monte Carlo simulation generated unconstrained negative occupancy rates. The student added truncation bounds (`pmin(pmax(..., 0.70), 1.00)`).
+* **Verification**: All statistical outputs were verified independently by executing local R scripts (`Rscript analysis/real_estate_analytics.R`) and auditing numerical results.
+
+---
+
+# 10. Application or Delivery
+
+The statistical assistant is delivered through three complementary channels:
+1. **Quarto Executable Report** (`analysis/report.qmd`): Renders standalone HTML and PDF statistical reports for client presentation.
+2. **R Plumber API Engine** (`analysis/plumber.R`): Level 3 local HTTP REST API running at `http://localhost:8000` with endpoints (`/explore`, `/compare`, `/model`, `/cap-rate-noi`, `/dom-elasticity`, `/monte-carlo-roi`, `/run-skill`).
+3. **Web Interface Dashboard**: Local web dashboard enabling real-time skill execution and parameter testing.
+
+---
+
+# 11. Limitations
+
+1. **Dataset Limitation**: Sample size is limited to cross-sectional active listings and lacks multi-year historical contract price closing data.
+2. **Statistical Limitation**: Regression models measure observational association and cannot guarantee causal price increments.
+3. **Implementation Limitation**: The local R Plumber API runs in a sandboxed container environment and requires local R runtime configuration.
+
+---
+
+# 12. Reflection
+
+### Learning Outcomes & Challenges
+* **Learned**: Designing agent skill guardrails (`SKILL.md`) forces rigorous definition of statistical assumptions and validation rules.
+* **Most Difficult**: Ensuring robust error handling in Plumber API endpoints to catch invalid user inputs before running matrix operations in R.
+
+### Skill Selection & Future Improvements
+* **Skill Selection**: Selected Cap Rate NOI, DOM Elasticity, and Monte Carlo ROI because they address real-world financial decision-making for real estate clients.
+* **Future Work**: With more time, I would incorporate direct MLS API auto-syncing and spatial auto-correlation mapping for coastal flood zones.
+
+---
+
+# 13. Advisory Contact & Realtor® Profile
+
+* **Lead Realtor®**: Konrad Schultz (License # 3188541)
+* **Brokerage**: Beachfront Realty, Inc.
+* **Aventura Office**: 20803 Biscayne Blvd, Suite 102, Aventura, FL 33180
+* **Direct Cell**: 954-297-5559
+* **Email**: KonradSchultz001@mymdc.net
